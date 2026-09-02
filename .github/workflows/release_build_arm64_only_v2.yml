@@ -1,4 +1,4 @@
-name: Build Release Arm64 APK
+name: Build Release Arm64-v8a
 
 on:
   workflow_dispatch:
@@ -127,6 +127,26 @@ jobs:
           ndk_version="${ndk_package#ndk;}"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ndk_version" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$ndk_version" >> "$GITHUB_ENV"
+
+      - name: Prepare Git submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Remove only a stale Git config lock if no Git process is using it.
+          if [ -f .git/config.lock ]; then
+            if ! pgrep -x git >/dev/null 2>&1; then
+              echo "Removing stale .git/config.lock"
+              rm -f .git/config.lock
+            else
+              echo "::error::A Git process is still running while .git/config.lock exists."
+              ps -ef | grep '[g]it' || true
+              exit 1
+            fi
+          fi
+
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - name: Build release APKs
         run: ./gradlew --no-daemon :app:assembleRelease
